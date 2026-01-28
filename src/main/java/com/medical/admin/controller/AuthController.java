@@ -23,6 +23,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
+    	System.out.println(" REGISTER API HIT");
+        System.out.println("User received: " + user.getUsername());
         return ResponseEntity.ok(authService.register(user));
     }
 

@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,10 @@ public class AuthService {
 
     @Autowired
     private JWTUtil jwtUtil;
+    
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
+
 
     // Register user
     public Map<String, Object> register(User user) {
@@ -37,10 +42,16 @@ public class AuthService {
             throw new RuntimeException("Email already exists");
         }
 
+        System.out.println("👉 Register called with username: " + user.getUsername());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User savedUser = userRepository.save(user);
 
-        String token = jwtUtil.generateToken(savedUser.getUsername());
+        UserDetails userDetails =
+                customUserDetailsService.loadUserByUsername(savedUser.getUsername());
+
+        String token = jwtUtil.generateToken(userDetails);
+
+        System.out.println("User saved with ID: " + savedUser.getUserId());
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "User registered successfully");
@@ -72,7 +83,11 @@ public class AuthService {
             throw new RuntimeException("Account is inactive");
         }
 
-        String token = jwtUtil.generateToken(user.getUsername());
+        UserDetails userDetails =
+                customUserDetailsService.loadUserByUsername(user.getUsername());
+
+        String token = jwtUtil.generateToken(userDetails);
+
 
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Login successful");
