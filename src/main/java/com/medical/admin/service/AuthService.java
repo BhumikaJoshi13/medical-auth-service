@@ -13,9 +13,11 @@ import com.medical.admin.entity.User;
 import com.medical.admin.repository.UserRepository;
 import com.medical.admin.security.JWTUtil;
 
-import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
+
 
 @Service
+@Transactional
 public class AuthService {
 
     @Autowired
@@ -42,7 +44,7 @@ public class AuthService {
             throw new RuntimeException("Email already exists");
         }
 
-        System.out.println("👉 Register called with username: " + user.getUsername());
+        System.out.println(" Register called with username: " + user.getUsername());
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         User savedUser = userRepository.save(user);
 
