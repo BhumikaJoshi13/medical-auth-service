@@ -18,6 +18,6 @@ public interface RoleRepository extends JpaRepository<Role, Long> {
     
     boolean existsByRoleName(String roleName);
  
-    @Query("SELECT r FROM Role r JOIN r.permissions p WHERE p.name = :permissionName")
+    @Query("SELECT r FROM Role r JOIN r.permissions p WHERE p.permissionName = :permissionName")
     Set<Role> findByPermissionName(@Param("permissionName") String permissionName);
 }

@@ -12,14 +12,14 @@ import java.util.List;
 public interface PermissionRepository extends JpaRepository<Permission, Long> {
     
    
-    Optional<Permission> findByName(String name);
+    Optional<Permission> findByPermissionName(String permissionname);
     
    
-    boolean existsByName(String name);
+    boolean existsByPermissionName(String permissionname);
     
  
     List<Permission> findByCategory(String category);
     
     
-    List<Permission> findByNameContaining(String keyword);
+    List<Permission> findByPermissionNameContaining(String keyword);
 }

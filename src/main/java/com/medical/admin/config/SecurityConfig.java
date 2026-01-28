@@ -43,8 +43,10 @@ public class SecurityConfig {
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/auth/**", "/test/**").permitAll()
-                    .anyRequest().authenticated()
+            		.requestMatchers("/auth/**", "/test/**", "/health/**").permitAll()
+            	    .requestMatchers("/roles/**", "/permissions/**").permitAll()  // TEMPORARY
+            	    .requestMatchers("/admin/**").authenticated()
+            	    .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

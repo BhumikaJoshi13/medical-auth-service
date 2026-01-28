@@ -14,7 +14,7 @@ public class Role {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "role_id")
-    private int roleId;
+    private Long roleId;
 
     @Column(unique = true, nullable = false, length = 50)
     private String roleName;
@@ -25,12 +25,12 @@ public class Role {
     @ManyToMany(mappedBy = "roles")
     private Set<User> users = new HashSet<>();
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
-        name = "role_permissions",
-        joinColumns = @JoinColumn(name = "role_id"),
-        inverseJoinColumns = @JoinColumn(name = "permission_id")
-    )
+            name = "role_permissions",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id")
+        )
     private Set<Permission> permissions = new HashSet<>();
 
     @CreationTimestamp
@@ -48,6 +48,8 @@ public class Role {
         this.roleName = roleName;
         this.description = description;
     }
+    
+ 
 
     // ✅ Helper methods
 
@@ -68,11 +70,11 @@ public class Role {
 
     // Getters and Setters
 
-    public int getRoleId() {
+    public Long getRoleId() {
         return roleId;
     }
 
-    public void setRoleId(int roleId) {
+    public void setRoleId(Long roleId) {
         this.roleId = roleId;
     }
 

@@ -1,143 +1,187 @@
 package com.medical.admin.security;
 
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import jakarta.annotation.PostConstruct;
-import lombok.Getter;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+import com.medical.admin.entity.User;
+import com.medical.admin.entity.Role;
 
-/**
- * JWT Utility class for generating, parsing, and validating JSON Web Tokens (JWT)
- * Used in Spring Boot authentication/authorization flow for stateless session management
- */
-@Component
-@Getter
+import java.security.Key;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Service
 public class JWTUtil {
 
-    /**
-     * JWT Secret Key injected from application.properties via @Value annotation
-     * Must be at least 256 bits (32 bytes) for HS256 algorithm compliance (RFC 7518)
-     */
     @Value("${jwt.secret}")
-    private String SECRET_KEY;
+    private String secret;
 
-    /**
-     * Effective signing key used for JWT operations
-     * Set during @PostConstruct initialization to ensure HS256 compliance
-     */
-    private String effectiveSecret;
+    @Value("${jwt.expiration}")
+    private Long expiration; // in milliseconds
 
-    /**
-     * Initializes the JWT utility after Spring bean construction
-     * Validates secret key length and sets effectiveSecret for signing operations
-     * Called automatically by Spring after dependency injection
-     */
-    @PostConstruct
-    public void init() {
-        // HS256 requires minimum 256 bits (32 bytes). Base64-encoded 32 bytes = ~44 characters
-        // Original error occurred because "mySecretKey123..." was only 40 chars (~240 bits)
-        if (SECRET_KEY.length() < 44) {
-            throw new IllegalArgumentException(
-                "JWT secret too short for HS256 algorithm. " +
-                "Minimum 256 bits required. Generate with: openssl rand -base64 32"
-            );
-        }
-        // Use the injected secret directly (assumed to be Base64 or sufficiently long string)
-        this.effectiveSecret = SECRET_KEY;
+    private Key getSigningKey() {
+        byte[] keyBytes = secret.getBytes();
+        return Keys.hmacShaKeyFor(keyBytes);
     }
 
     /**
-     * Extracts username (subject) claim from JWT token
-     * @param token Compact JWT string (Header.Payload.Signature)
-     * @return username stored as subject claim
+     * Generate token with user details and roles
+     */
+    public String generateToken(User user) {
+        Map<String, Object> claims = new HashMap<>();
+        
+        // Add user-specific claims
+        claims.put("userId", user.getUserId());
+        claims.put("email", user.getEmail());
+        claims.put("username", user.getUsername());
+        
+        // Add roles as a list of role names
+        List<String> roleNames = user.getRoles().stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toList());
+        claims.put("roles", roleNames);
+        
+        // Add permissions (flattened from all roles)
+        Set<String> permissions = user.getRoles().stream()
+                .flatMap(role -> role.getPermissions().stream())
+                .map(permission -> permission.getName())
+                .collect(Collectors.toSet());
+        claims.put("permissions", new ArrayList<>(permissions));
+        
+        return createToken(claims, user.getUsername());
+    }
+
+    /**
+     * Generate token with UserDetails (for Spring Security)
+     */
+    public String generateToken(UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("username", userDetails.getUsername());
+        
+        // Extract roles from authorities
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .collect(Collectors.toList());
+        claims.put("roles", roles);
+        
+        return createToken(claims, userDetails.getUsername());
+    }
+
+    /**
+     * Create token with custom claims
+     */
+    private String createToken(Map<String, Object> claims, String subject) {
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(subject)
+                .setIssuedAt(new Date(System.currentTimeMillis()))
+                .setExpiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    /**
+     * Extract username from token
      */
     public String extractUsername(String token) {
-        return extractAllClaims(token).getSubject();
+        return extractClaim(token, Claims::getSubject);
     }
 
     /**
-     * Extracts expiration date from JWT token claims
-     * @param token Compact JWT string
-     * @return Date when token expires
+     * Extract user ID from token
+     */
+    public Long extractUserId(String token) {
+        Claims claims = extractAllClaims(token);
+        return claims.get("userId", Long.class);
+    }
+
+    /**
+     * Extract roles from token
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+        return (List<String>) claims.get("roles");
+    }
+
+    /**
+     * Extract permissions from token
+     */
+    @SuppressWarnings("unchecked")
+    public List<String> extractPermissions(String token) {
+        Claims claims = extractAllClaims(token);
+        return (List<String>) claims.get("permissions");
+    }
+
+    /**
+     * Extract expiration date from token
      */
     public Date extractExpiration(String token) {
-        return extractAllClaims(token).getExpiration();
+        return extractClaim(token, Claims::getExpiration);
     }
 
     /**
-     * Parses complete JWT token and extracts all claims from payload
-     * Uses effectiveSecret for signature verification
-     * @param token Compact JWT string to parse
-     * @return Claims object containing all JWT payload data
+     * Extract specific claim from token
+     */
+    public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+        final Claims claims = extractAllClaims(token);
+        return claimsResolver.apply(claims);
+    }
+
+    /**
+     * Extract all claims from token
      */
     private Claims extractAllClaims(String token) {
-        return Jwts.parser()                           // Create JWT parser
-                .setSigningKey(effectiveSecret)        // Set secret key for signature verification
-                .parseClaimsJws(token)                 // Parse and verify JWT, extract body
-                .getBody();                            // Return claims payload
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 
     /**
-     * Checks if JWT token has expired
-     * Compares token expiration date with current system time
-     * @param token JWT token to validate
-     * @return true if token is expired, false otherwise
+     * Check if token is expired
      */
     private Boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
     /**
-     * Generates new JWT token for given username with default 10-hour expiration
-     * Creates empty claims map (can be extended for roles/permissions)
-     * @param username User identifier to embed as subject claim
-     * @return Compact JWT string ready for HTTP Authorization header
+     * Validate token against user details
      */
-    public String generateToken(String username) {
-        Map<String, Object> claims = new HashMap<>();   // Custom claims (roles, permissions, etc.)
-        return createToken(claims, username);
+    public Boolean validateToken(String token, UserDetails userDetails) {
+        final String username = extractUsername(token);
+        return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
     }
-
     /**
-     * Core token creation method with customizable claims and subject
-     * HS256 signing algorithm ensures token integrity and authenticity
-     * @param claims Custom claims to embed in JWT payload
-     * @param subject Primary identifier (usually username)
-     * @return Signed compact JWT token
+     * Validate token
      */
-    private String createToken(Map<String, Object> claims, String subject) {
-        return Jwts.builder()                                    // Start JWT builder
-                .setClaims(claims)                               // Add custom claims to payload
-                .setSubject(subject)                             // Set username as subject claim
-                .setIssuedAt(new Date(System.currentTimeMillis())) // Set issuance timestamp (iat)
-                .setExpiration(new Date(                         // Set expiration (exp) - 10 hours from now
-                    System.currentTimeMillis() + 1000 * 60 * 60 * 10
-                ))
-                .signWith(SignatureAlgorithm.HS256, effectiveSecret) // Sign with HS256 + secret key
-                .compact();                                      // Generate compact serialized token
-    }
-
-    /**
-     * Validates JWT token for specific username
-     * Checks: 1) Token signature valid, 2) Not expired, 3) Subject matches expected username
-     * @param token JWT token from Authorization header
-     * @param username Expected username from authentication request
-     * @return true if token is valid for this user, false otherwise
-     */
-    public Boolean validateToken(String token, String username) {
+    public Boolean validateToken(String token) {
         try {
-            final String extractedUsername = extractUsername(token);  // Extract and verify subject
-            return (extractedUsername.equals(username) && !isTokenExpired(token));
+            return !isTokenExpired(token);
         } catch (Exception e) {
-            // Token parsing failed (invalid signature, malformed, etc.)
             return false;
         }
+    }
+
+    /**
+     * Check if user has specific role
+     */
+    public Boolean hasRole(String token, String roleName) {
+        List<String> roles = extractRoles(token);
+        return roles != null && roles.contains(roleName);
+    }
+
+    /**
+     * Check if user has specific permission
+     */
+    public Boolean hasPermission(String token, String permissionName) {
+        List<String> permissions = extractPermissions(token);
+        return permissions != null && permissions.contains(permissionName);
     }
 }

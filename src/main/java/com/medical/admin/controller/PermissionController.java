@@ -13,7 +13,7 @@ import com.medical.admin.entity.Permission;
 import com.medical.admin.repository.PermissionRepository;
 
 @RestController
-@RequestMapping("/api/permissions")
+@RequestMapping("/permissions")
 public class PermissionController {
 
     @Autowired

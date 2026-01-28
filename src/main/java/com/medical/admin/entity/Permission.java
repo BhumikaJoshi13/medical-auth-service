@@ -18,8 +18,10 @@ public class Permission {
     private int permissionId;
     
 
-    @Column(unique = true, nullable = false, length = 100)
-    private String name;
+    @Column(name = "permission_name" ,unique = true, nullable = false, length = 100)
+    private String permissionName;
+    
+
    
     @Column(length = 255)
     private String description;
@@ -43,8 +45,8 @@ public class Permission {
     // Constructors
     public Permission() {}
     
-    public Permission(String name, String description, String category) {
-        this.name = name;
+    public Permission(String permissionName, String description, String category) {
+        this.permissionName = permissionName;
         this.description = description;
         this.category = category;
     }
@@ -59,11 +61,11 @@ public class Permission {
     }
     
     public String getName() {
-        return name;
+        return permissionName;
     }
     
-    public void setName(String name) {
-        this.name = name;
+    public void setName(String permissionname) {
+        this.permissionName = permissionname;
     }
     
     public String getDescription() {

@@ -54,11 +54,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 return;
             }
         }
+        
+        
 
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            if (jwtUtil.validateToken(token, userDetails.getUsername())) {
+            if (jwtUtil.validateToken(token)) {
+                // Token is valid, now check if username matches
+                String tokenUsername = jwtUtil.extractUsername(token);
+                if (tokenUsername.equals(userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails, null, userDetails.getAuthorities());
@@ -69,4 +74,5 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         filterChain.doFilter(request, response);
     }
+}
 }
