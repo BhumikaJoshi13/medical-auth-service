@@ -1,15 +1,20 @@
 package com.medical.admin.service;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.medical.admin.dto.UserCreateRequest;
 import com.medical.admin.entity.Role;
 import com.medical.admin.entity.User;
+import com.medical.admin.repository.RoleRepository;
 import com.medical.admin.repository.UserRepository;
 import com.medical.admin.security.JWTUtil;
 
@@ -27,6 +32,9 @@ public class AuthService {
     private PasswordEncoder passwordEncoder;
 
     @Autowired
+    RoleRepository rolerepository;
+    
+    @Autowired
     private JWTUtil jwtUtil;
     
     @Autowired
@@ -34,27 +42,69 @@ public class AuthService {
 
 
     // Register user
-    public Map<String, Object> register(User user) {
-
-        if (userRepository.existsByUsername(user.getUsername())) {
+    @Transactional
+    public Map<String, Object> register(UserCreateRequest request) {
+        
+        // Validation
+        if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Username already exists");
         }
-
-        if (userRepository.existsByEmail(user.getEmail())) {
+        
+        if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
-
-        System.out.println(" Register called with username: " + user.getUsername());
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        
+        System.out.println("🔵 Register called with username: " + request.getUsername());
+        
+        // Create User entity
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFirstName(request.getFirstName());
+        user.setLastname(request.getLastname());
+        user.setPhone(request.getPhone());
+        
+        // Get role from request
+        String roleName = request.getRole();
+        
+        System.out.println("🔍 Role from request: " + roleName);
+        
+        if (roleName == null || roleName.trim().isEmpty()) {
+            roleName = "PATIENT"; // Default role
+            System.out.println("⚠️ No role provided, using default: " + roleName);
+        }
+        
+        final String finalRoleName = roleName;
+        // Fetch the Role entity from database
+        Role userRole = rolerepository.findByRoleName(roleName)
+            .orElseThrow(() -> new RuntimeException("Role '" + finalRoleName+ "' not found in database. Please ensure the role exists in the 'role' table."));
+        
+        System.out.println(" Fetched role from DB: " + userRole.getRoleName() + " (ID: " + userRole.getRoleId() + ")");
+        
+        // Assign the role to user
+        Set<Role> roles = new HashSet<>();
+        roles.add(userRole);
+        user.setRoles(roles);
+        
+        System.out.println("📝 Roles assigned to user before save: " + 
+            user.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()));
+        
+        // Save user (this will automatically populate user_role table due to @ManyToMany)
         User savedUser = userRepository.save(user);
-
-        UserDetails userDetails =
+        
+        System.out.println(" User saved with ID: " + savedUser.getUserId());
+        System.out.println("Roles after save: " + 
+            savedUser.getRoles().stream().map(Role::getRoleName).collect(Collectors.toList()));
+        
+        // Load user details for JWT
+        UserDetails userDetails = 
                 customUserDetailsService.loadUserByUsername(savedUser.getUsername());
-
+        
+        // Generate token
         String token = jwtUtil.generateToken(userDetails);
-
-        System.out.println("User saved with ID: " + savedUser.getUserId());
-
+        
+        // Build response
         Map<String, Object> response = new HashMap<>();
         response.put("message", "User registered successfully");
         response.put("token", token);
@@ -67,10 +117,9 @@ public class AuthService {
                          .map(Role::getRoleName)
                          .toList()
         );
-
+        
         return response;
     }
-
     //Login 
     public Map<String, Object> login(User request) {
 

@@ -7,6 +7,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.medical.admin.dto.UserCreateRequest;
 import com.medical.admin.entity.User;
 import com.medical.admin.service.AuthService;
 
@@ -20,7 +22,7 @@ public class AuthController {
     private AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody User user) {
+    public ResponseEntity<?> register(@RequestBody UserCreateRequest user) {
     	System.out.println(" REGISTER API HIT");
         System.out.println("User received: " + user.getUsername());
         return ResponseEntity.ok(authService.register(user));

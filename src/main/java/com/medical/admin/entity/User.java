@@ -53,10 +53,11 @@ public class User {
     
     /**
      * Many-to-Many relationship with Role.
+     * 
      */
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
-        name = "user_roles",
+        name = "user_role",  
         joinColumns = @JoinColumn(name = "user_id"),
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
@@ -65,13 +66,7 @@ public class User {
     // Constructors
     public User() {}
     
-    public User(String username, String email, String password, String firstName, String lastname) {
-        this.username = username;
-        this.email = email;
-        this.password = password;
-        this.firstName = firstName;
-        this.lastname = lastname;
-    }
+  
     
     // ==================== HELPER METHODS ====================
     
@@ -101,7 +96,7 @@ public class User {
     
     /**
      * Check if user has specific permission.
-   */
+     */
     public boolean hasPermission(String permissionName) {
         return roles.stream()
                 .flatMap(role -> role.getPermissions().stream())
