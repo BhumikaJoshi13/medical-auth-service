@@ -26,6 +26,7 @@ import java.util.Map;
  * REST Controller for User Management operations.
  */
 @RestController
+@CrossOrigin(origins = "http://localhost:5173")
 @RequestMapping("/admin/users")
 @PreAuthorize("hasRole('ADMIN')")
 public class UserManagementController {
